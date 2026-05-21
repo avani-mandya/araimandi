@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Araimandi — Bharatanatyam Posture Corrector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:          #0c0b09;
+      --bg2:         #131210;
+      --bg3:         #1a1814;
+      --gold:        #c9a84c;
+      --gold-light:  #e2c476;
+      --gold-dim:    rgba(201,168,76,0.15);
+      --gold-border: rgba(201,168,76,0.25);
+      --cream:       #f0ead8;
+      --cream-dim:   rgba(240,234,216,0.55);
+      --cream-muted: rgba(240,234,216,0.3);
+      --border:      rgba(201,168,76,0.18);
+      --green:  #27ae60;
+      --amber:  #e67e22;
+      --red:    #e74c3c;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--cream); min-height: 100vh; overflow-x: hidden; }
+
+    /* grain */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0; opacity: 0.4;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.1rem 3rem;
+      background: rgba(12,11,9,0.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 0.5px solid var(--border);
+    }
+    .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--gold-light); text-decoration: none; }
+    .nav-logo span { color: var(--cream-dim); font-weight: 400; font-style: italic; font-size: 0.88rem; }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a { color: var(--cream-dim); text-decoration: none; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; transition: color .2s; }
+    .nav-links a:hover { color: var(--gold-light); }
+    .nav-cta { background: transparent; border: 0.5px solid var(--gold-border); color: var(--gold-light); padding: .5rem 1.2rem; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; font-family: 'DM Sans',sans-serif; transition: background .2s; border-radius: 2px; }
+    .nav-cta:hover { background: var(--gold-dim); }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center;
+      padding: 8rem 2rem 4rem; position: relative; overflow: hidden;
+    }
+    .hero-mandala {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: 680px; height: 680px; opacity: 0.05; pointer-events: none;
+      animation: spin 80s linear infinite;
+    }
+    @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+    @keyframes fade-up { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+    .hero-eyebrow { font-size: .68rem; letter-spacing: .25em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.5rem; opacity:0; animation: fade-up .8s .2s forwards; }
+    .hero-title { font-family: 'Cormorant Garamond',serif; font-size: clamp(3rem,8vw,6.5rem); font-weight: 500; line-height: 1; color: var(--cream); margin-bottom: .3rem; opacity:0; animation: fade-up .8s .35s forwards; }
+    .hero-title em { font-style: italic; color: var(--gold-light); }
+    .hero-sub { font-family: 'Cormorant Garamond',serif; font-size: clamp(1rem,2.5vw,1.5rem); font-style: italic; color: var(--cream-dim); margin-bottom: 2rem; opacity:0; animation: fade-up .8s .5s forwards; }
+    .hero-desc { max-width: 500px; font-size: .9rem; color: var(--cream-dim); line-height: 1.8; margin-bottom: 2.5rem; opacity:0; animation: fade-up .8s .65s forwards; }
+    .hero-actions { display: flex; gap: 1rem; opacity:0; animation: fade-up .8s .8s forwards; }
+    .btn-primary { background: var(--gold); color: #0c0b09; border: none; padding: .85rem 2.2rem; font-size: .83rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; font-family: 'DM Sans',sans-serif; border-radius: 2px; transition: background .2s, transform .15s; text-decoration: none; display: inline-block; }
+    .btn-primary:hover { background: var(--gold-light); transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: var(--cream-dim); border: 0.5px solid rgba(240,234,216,.2); padding: .85rem 2.2rem; font-size: .83rem; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; font-family: 'DM Sans',sans-serif; border-radius: 2px; transition: border-color .2s, color .2s; text-decoration: none; display: inline-block; }
+    .btn-ghost:hover { border-color: var(--gold-border); color: var(--gold-light); }
+    .scroll-hint { position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: .5rem; opacity:0; animation: fade-up .8s 1.2s forwards; }
+    .scroll-hint span { font-size: .62rem; letter-spacing: .2em; text-transform: uppercase; color: var(--cream-muted); }
+    .scroll-line { width: .5px; height: 40px; background: linear-gradient(to bottom, var(--gold), transparent); animation: blink 2s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+    /* ── SECTIONS ── */
+    section { position: relative; z-index: 1; }
+    .s-label { font-size: .64rem; letter-spacing: .25em; text-transform: uppercase; color: var(--gold); margin-bottom: 1rem; display: block; }
+    .s-title { font-family: 'Cormorant Garamond',serif; font-size: clamp(1.8rem,4vw,3rem); font-weight: 500; color: var(--cream); line-height: 1.15; margin-bottom: 1rem; }
+    .s-title em { font-style: italic; color: var(--gold-light); }
+    .s-body { font-size: .88rem; color: var(--cream-dim); line-height: 1.8; max-width: 500px; }
+
+    /* ── HOW ── */
+    #how { padding: 7rem 3rem; max-width: 1200px; margin: 0 auto; }
+    #how .intro { margin-bottom: 3.5rem; }
+    .steps-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.5px; background: var(--border); }
+    .step-card { background: var(--bg2); padding: 2.5rem 2rem; position: relative; overflow: hidden; transition: background .25s; }
+    .step-card:hover { background: var(--bg3); }
+    .step-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background: linear-gradient(to right, transparent, var(--gold), transparent); opacity:0; transition: opacity .3s; }
+    .step-card:hover::before { opacity:1; }
+    .step-num { font-family:'Cormorant Garamond',serif; font-size:3.5rem; font-weight:400; color:var(--gold-dim); line-height:1; margin-bottom:1.2rem; display:block; }
+    .step-title { font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:500; color:var(--cream); margin-bottom:.6rem; }
+    .step-desc { font-size:.78rem; color:var(--cream-dim); line-height:1.7; }
+
+    /* ── ANALYZER ── */
+    #analyzer { padding: 7rem 3rem; background: var(--bg2); border-top: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border); }
+    .analyzer-inner { max-width: 1200px; margin: 0 auto; }
+    .analyzer-header { text-align: center; margin-bottom: 3rem; }
+    .analyzer-layout { display: grid; grid-template-columns: 1fr 300px; gap: 2rem; align-items: start; }
+
+    /* Camera */
+    .camera-panel { border: 0.5px solid var(--border); border-radius: 4px; overflow: hidden; background: #080806; }
+    .cam-topbar { display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem; background: rgba(201,168,76,.06); border-bottom: 0.5px solid var(--border); }
+    .cam-title { font-size:.68rem; letter-spacing:.15em; text-transform:uppercase; color:var(--gold); }
+    .live-badge { display:flex; align-items:center; gap:6px; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--cream-muted); }
+    .live-dot { width:6px; height:6px; border-radius:50%; background:#444; transition: background .3s; }
+    .live-dot.on { background:var(--green); box-shadow:0 0 8px rgba(39,174,96,.5); animation: blink 2s infinite; }
+    #stream-img { width:100%; display:block; aspect-ratio: 4/3; object-fit:cover; }
+    .cam-bottom { padding:1rem; display:flex; align-items:center; justify-content:space-between; border-top:0.5px solid var(--border); }
+    #cam-status { font-size:.73rem; color:var(--cream-muted); }
+
+    /* Metrics */
+    .metrics-panel { display:flex; flex-direction:column; gap:1rem; }
+    .score-card { background:var(--bg); border:0.5px solid var(--border); border-radius:4px; padding:1.4rem; text-align:center; }
+    .score-lbl { font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--cream-muted); margin-bottom:.75rem; display:block; }
+    #score-num { font-family:'Cormorant Garamond',serif; font-size:3.8rem; font-weight:500; line-height:1; color:var(--cream); transition:color .4s; }
+    #score-verdict { font-size:.73rem; color:var(--cream-dim); margin-top:.4rem; }
+
+    .angles-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5px; background:var(--border); border:0.5px solid var(--border); border-radius:4px; overflow:hidden; }
+    .angle-cell { background:var(--bg); padding:.9rem 1rem; }
+    .angle-name { font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:var(--cream-muted); margin-bottom:.35rem; display:block; }
+    .angle-val { font-family:'Cormorant Garamond',serif; font-size:1.55rem; font-weight:500; color:var(--cream); line-height:1; transition:color .3s; }
+    .angle-status { font-size:.62rem; margin-top:.25rem; color:var(--cream-muted); transition:color .3s; }
+
+    .c-good { color: var(--green) !important; }
+    .c-warn { color: var(--amber) !important; }
+    .c-bad  { color: var(--red)   !important; }
+
+    .feedback-box { background:var(--bg); border:0.5px solid var(--border); border-radius:4px; padding:1.1rem; }
+    .fb-title { font-size:.58rem; letter-spacing:.2em; text-transform:uppercase; color:var(--cream-muted); margin-bottom:.7rem; display:block; }
+    .fb-item { display:flex; align-items:flex-start; gap:.55rem; margin-bottom:.5rem; font-size:.76rem; color:var(--cream-dim); line-height:1.5; }
+    .fb-dot { width:5px; height:5px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+
+    /* ── ABOUT ── */
+    #about { padding:7rem 3rem; max-width:1200px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:5rem; align-items:center; }
+    .about-visual { position:relative; aspect-ratio:3/4; }
+    .about-frame { position:absolute; inset:0; border:0.5px solid var(--border); border-radius:4px; overflow:hidden; background:var(--bg2); }
+    .deco-ring { position:absolute; border:0.5px solid var(--gold-border); border-radius:50%; pointer-events:none; }
+    .about-list { margin-top:2rem; display:flex; flex-direction:column; gap:1.5rem; }
+    .about-item { display:flex; gap:1.25rem; align-items:flex-start; }
+    .about-num { font-family:'Cormorant Garamond',serif; font-size:1.5rem; color:var(--gold); line-height:1; flex-shrink:0; width:2rem; }
+    .about-content h4 { font-size:.83rem; font-weight:500; color:var(--cream); margin-bottom:.3rem; }
+    .about-content p { font-size:.78rem; color:var(--cream-dim); line-height:1.7; }
+
+    /* ── FOOTER ── */
+    footer { border-top:0.5px solid var(--border); padding:2.5rem 3rem; display:flex; align-items:center; justify-content:space-between; }
+    .footer-logo { font-family:'Cormorant Garamond',serif; font-size:1.1rem; color:var(--gold-light); }
+    .footer-note { font-size:.7rem; color:var(--cream-muted); }
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:900px){
+      nav { padding:1rem 1.5rem; }
+      .nav-links { display:none; }
+      #how, #about { padding:5rem 1.5rem; }
+      .steps-grid { grid-template-columns:1fr 1fr; }
+      #analyzer { padding:5rem 1.5rem; }
+      .analyzer-layout { grid-template-columns:1fr; }
+      #about { grid-template-columns:1fr; }
+      .about-visual { aspect-ratio:4/3; }
+      footer { flex-direction:column; gap:1rem; text-align:center; }
+      .hero-actions { flex-direction:column; align-items:center; }
+    }
+    @media(max-width:600px){
+      .steps-grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">Araimandi <span>/ AI Posture</span></a>
+  <ul class="nav-links">
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#analyzer">Analyzer</a></li>
+    <li><a href="#about">About</a></li>
+  </ul>
+  <button class="nav-cta" onclick="document.getElementById('analyzer').scrollIntoView({behavior:'smooth'})">Try Now</button>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <svg class="hero-mandala" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="200" cy="200" r="185" stroke="#c9a84c" stroke-width=".5"/>
+    <circle cx="200" cy="200" r="140" stroke="#c9a84c" stroke-width=".5"/>
+    <circle cx="200" cy="200" r="95"  stroke="#c9a84c" stroke-width=".5"/>
+    <circle cx="200" cy="200" r="50"  stroke="#c9a84c" stroke-width=".5"/>
+    <line x1="200" y1="15" x2="200" y2="385" stroke="#c9a84c" stroke-width=".5"/>
+    <line x1="15"  y1="200" x2="385" y2="200" stroke="#c9a84c" stroke-width=".5"/>
+    <line x1="68"  y1="68"  x2="332" y2="332" stroke="#c9a84c" stroke-width=".5"/>
+    <line x1="332" y1="68"  x2="68"  y2="332" stroke="#c9a84c" stroke-width=".5"/>
+    <polygon points="200,38 362,305 38,305"  stroke="#c9a84c" stroke-width=".5" fill="none"/>
+    <polygon points="200,362 38,95 362,95"   stroke="#c9a84c" stroke-width=".5" fill="none"/>
+    <circle cx="200" cy="200" r="8"  stroke="#c9a84c" stroke-width="1" fill="none"/>
+  </svg>
+
+  <p class="hero-eyebrow">Bharatanatyam · Python · MediaPipe · Real-time</p>
+  <h1 class="hero-title">Master the<br /><em>Araimandi</em></h1>
+  <p class="hero-sub">The half-sitting posture at the heart of classical dance</p>
+  <p class="hero-desc">An AI vision system that analyses your Araimandi posture in real-time — detecting knee angles, hip alignment, and spinal position to prevent injury and accelerate mastery.</p>
+  <div class="hero-actions">
+    <a href="#analyzer" class="btn-primary">Open Analyzer</a>
+    <a href="#how"      class="btn-ghost">How it works</a>
+  </div>
+  <div class="scroll-hint">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="intro">
+    <span class="s-label">The Technology</span>
+    <h2 class="s-title">Computer vision meets<br /><em>classical precision</em></h2>
+    <p class="s-body">Python + MediaPipe Pose tracks 33 body landmarks in 3D space from your webcam, computing joint angles that define a correct Araimandi.</p>
+  </div>
+  <div class="steps-grid">
+    <div class="step-card">
+      <span class="step-num">01</span>
+      <p class="step-title">Webcam Capture</p>
+      <p class="step-desc">OpenCV reads your live video feed locally. Nothing is uploaded to any server.</p>
+    </div>
+    <div class="step-card">
+      <span class="step-num">02</span>
+      <p class="step-title">Skeleton Detection</p>
+      <p class="step-desc">MediaPipe Pose extracts 33 anatomical 3D landmarks at up to 30 fps.</p>
+    </div>
+    <div class="step-card">
+      <span class="step-num">03</span>
+      <p class="step-title">Angle Computation</p>
+      <p class="step-desc">Custom NumPy vector math calculates knee, hip, and spine angles in 3D space.</p>
+    </div>
+    <div class="step-card">
+      <span class="step-num">04</span>
+      <p class="step-title">Live Feedback</p>
+      <p class="step-desc">Scored corrections update every frame — colour-coded joints and text prompts.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ANALYZER -->
+<section id="analyzer">
+  <div class="analyzer-inner">
+    <div class="analyzer-header">
+      <span class="s-label">Live Analyzer</span>
+      <h2 class="s-title">Real-time posture <em>correction</em></h2>
+    </div>
+    <div class="analyzer-layout">
+
+      <!-- Stream -->
+      <div class="camera-panel">
+        <div class="cam-topbar">
+          <span class="cam-title">Live Feed · Python Backend</span>
+          <div class="live-badge">
+            <div class="live-dot on" id="live-dot"></div>
+            <span id="live-label">Streaming</span>
+          </div>
+        </div>
+        <img id="stream-img" src="/video_feed" alt="Live posture feed" />
+        <div class="cam-bottom">
+          <span id="cam-status">Connecting to camera…</span>
+        </div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="metrics-panel">
+        <div class="score-card">
+          <span class="score-lbl">Posture Score</span>
+          <div id="score-num">—</div>
+          <div id="score-verdict">Awaiting pose detection</div>
+        </div>
+
+        <div class="angles-grid">
+          <div class="angle-cell">
+            <span class="angle-name">Left Knee</span>
+            <div class="angle-val" id="lk-val">—</div>
+            <div class="angle-status" id="lk-st"> </div>
+          </div>
+          <div class="angle-cell">
+            <span class="angle-name">Right Knee</span>
+            <div class="angle-val" id="rk-val">—</div>
+            <div class="angle-status" id="rk-st"> </div>
+          </div>
+          <div class="angle-cell">
+            <span class="angle-name">Hip Width</span>
+            <div class="angle-val" id="hw-val">—</div>
+            <div class="angle-status" id="hw-st"> </div>
+          </div>
+          <div class="angle-cell">
+            <span class="angle-name">Spine</span>
+            <div class="angle-val" id="sp-val">—</div>
+            <div class="angle-status" id="sp-st"> </div>
+          </div>
+        </div>
+
+        <div class="feedback-box">
+          <span class="fb-title">Live Corrections</span>
+          <div id="feedback-list">
+            <p style="font-size:.76rem;color:var(--cream-muted);font-style:italic;font-family:'Cormorant Garamond',serif;">Begin your Araimandi stance to receive feedback.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about">
+  <div class="about-visual">
+    <div class="deco-ring" style="top:-1.5rem;right:-1.5rem;width:200px;height:200px;"></div>
+    <div class="deco-ring" style="bottom:-2rem;left:-2rem;width:120px;height:120px;opacity:.5;"></div>
+    <div class="about-frame">
+      <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+        <line x1="0" y1="200" x2="300" y2="200" stroke="rgba(201,168,76,.07)" stroke-width=".5"/>
+        <line x1="150" y1="0" x2="150" y2="400" stroke="rgba(201,168,76,.07)" stroke-width=".5"/>
+        <line x1="40" y1="340" x2="260" y2="340" stroke="rgba(201,168,76,.18)" stroke-width=".5" stroke-dasharray="4 4"/>
+        <circle cx="150" cy="70" r="22" fill="none" stroke="rgba(201,168,76,.5)" stroke-width="1"/>
+        <line x1="150" y1="92"  x2="150" y2="145" stroke="rgba(201,168,76,.6)" stroke-width="1.5"/>
+        <line x1="90"  y1="130" x2="210" y2="130" stroke="rgba(201,168,76,.6)" stroke-width="1.5"/>
+        <line x1="90"  y1="130" x2="65"  y2="185" stroke="rgba(201,168,76,.35)" stroke-width="1.5"/>
+        <line x1="65"  y1="185" x2="50"  y2="240" stroke="rgba(201,168,76,.35)" stroke-width="1.5"/>
+        <line x1="210" y1="130" x2="235" y2="185" stroke="rgba(201,168,76,.35)" stroke-width="1.5"/>
+        <line x1="235" y1="185" x2="250" y2="240" stroke="rgba(201,168,76,.35)" stroke-width="1.5"/>
+        <line x1="150" y1="145" x2="150" y2="210" stroke="rgba(201,168,76,.6)" stroke-width="1.5"/>
+        <line x1="100" y1="210" x2="200" y2="210" stroke="rgba(201,168,76,.6)" stroke-width="1.5"/>
+        <!-- legs splayed correct -->
+        <line x1="100" y1="210" x2="62"  y2="285" stroke="#27ae60" stroke-width="2"/>
+        <line x1="62"  y1="285" x2="70"  y2="340" stroke="#27ae60" stroke-width="2"/>
+        <line x1="200" y1="210" x2="238" y2="285" stroke="#27ae60" stroke-width="2"/>
+        <line x1="238" y1="285" x2="230" y2="340" stroke="#27ae60" stroke-width="2"/>
+        <!-- joints -->
+        <circle cx="150" cy="145" r="4" fill="rgba(201,168,76,.6)"/>
+        <circle cx="100" cy="210" r="4" fill="rgba(201,168,76,.6)"/>
+        <circle cx="200" cy="210" r="4" fill="rgba(201,168,76,.6)"/>
+        <circle cx="62"  cy="285" r="7" fill="#27ae60" opacity=".9"/>
+        <circle cx="238" cy="285" r="7" fill="#27ae60" opacity=".9"/>
+        <circle cx="70"  cy="340" r="4" fill="rgba(201,168,76,.4)"/>
+        <circle cx="230" cy="340" r="4" fill="rgba(201,168,76,.4)"/>
+        <!-- angle arcs -->
+        <path d="M 62 270 A 20 20 0 0 1 76 293"  fill="none" stroke="#27ae60" stroke-width="1" opacity=".6"/>
+        <path d="M 238 270 A 20 20 0 0 0 224 293" fill="none" stroke="#27ae60" stroke-width="1" opacity=".6"/>
+        <text x="28"  y="285" fill="rgba(39,174,96,.8)" font-size="9" font-family="'DM Sans',sans-serif">~90°</text>
+        <text x="246" y="285" fill="rgba(39,174,96,.8)" font-size="9" font-family="'DM Sans',sans-serif">~90°</text>
+        <text x="150" y="375" text-anchor="middle" fill="rgba(201,168,76,.4)" font-size="8" letter-spacing="2" font-family="'DM Sans',sans-serif">CORRECT ARAIMANDI</text>
+      </svg>
+    </div>
+  </div>
+
+  <div>
+    <span class="s-label">Why this matters</span>
+    <h2 class="s-title">Precision posture,<br /><em>injury prevention</em></h2>
+    <p class="s-body">In Bharatanatyam, Araimandi is the foundational half-sitting stance. Incorrect alignment causes lasting knee and lower back damage over time.</p>
+    <div class="about-list">
+      <div class="about-item">
+        <span class="about-num">01</span>
+        <div class="about-content">
+          <h4>Knees must open outward ~90°</h4>
+          <p>Both knees should point directly sideways — not forward. The analyzer flags any deviation in real-time.</p>
+        </div>
+      </div>
+      <div class="about-item">
+        <span class="about-num">02</span>
+        <div class="about-content">
+          <h4>Spine stays perfectly vertical</h4>
+          <p>Any forward or backward lean increases load on the lumbar spine and disrupts balance.</p>
+        </div>
+      </div>
+      <div class="about-item">
+        <span class="about-num">03</span>
+        <div class="about-content">
+          <h4>Hips square and wide</h4>
+          <p>The pelvis should be square to the front with hip width indicating a proper wide stance.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span class="footer-logo">Araimandi</span>
+  <span class="footer-note">Python · Flask · OpenCV · MediaPipe · Runs locally</span>
+</footer>
+
+<script>
+  // Poll /metrics every 500ms and update the panel
+  async function fetchMetrics() {
+    try {
+      const res = await fetch('/metrics');
+      const d = await res.json();
+
+      const dot = document.getElementById('live-dot');
+      const liveLabel = document.getElementById('live-label');
+      const camStatus = document.getElementById('cam-status');
+
+      if (d.pose_detected) {
+        dot.className = 'live-dot on';
+        liveLabel.textContent = 'Live · Analysing';
+        camStatus.textContent = 'Pose detected — analysing';
+      } else {
+        dot.className = 'live-dot';
+        dot.style.background = '#e67e22';
+        liveLabel.textContent = 'Searching…';
+        camStatus.textContent = d.verdict || 'No pose detected';
+      }
+
+      // Score
+      const sn = document.getElementById('score-num');
+      if (d.score !== null) {
+        sn.textContent = d.score + '%';
+        sn.style.color = d.score >= 80 ? 'var(--green)' : d.score >= 50 ? 'var(--amber)' : 'var(--red)';
+      }
+      document.getElementById('score-verdict').textContent = d.verdict || '—';
+
+      // Angles
+      function setCell(valId, stId, val, cls, lbl) {
+        const v = document.getElementById(valId);
+        const s = document.getElementById(stId);
+        if (val !== null && val !== undefined) {
+          v.textContent = val + (valId.includes('hw') ? '%' : '°');
+          v.className = 'angle-val c-' + cls;
+          s.textContent = lbl;
+          s.className = 'angle-status c-' + cls;
+        }
+      }
+      setCell('lk-val','lk-st', d.left_knee,  d.lk_cls, d.lk_status);
+      setCell('rk-val','rk-st', d.right_knee, d.rk_cls, d.rk_status);
+      setCell('sp-val','sp-st', d.spine,       d.sp_cls, d.sp_status);
+      setCell('hw-val','hw-st', d.hip_width,   d.hw_cls, d.hw_status);
+
+      // Feedback
+      const fl = document.getElementById('feedback-list');
+      if (d.feedback && d.feedback.length) {
+        const colorMap = { good:'var(--green)', warn:'var(--amber)', bad:'var(--red)' };
+        fl.innerHTML = d.feedback.map(msg => {
+          const c = msg.includes('Perfect') ? 'good' : msg.includes('Correct') ? 'good' : 'warn';
+          return `<div class="fb-item"><div class="fb-dot" style="background:${colorMap[c] || 'var(--amber)'}"></div><span>${msg}</span></div>`;
+        }).join('');
+      }
+    } catch(e) {
+      // Server not ready yet
+    }
+  }
+
+  setInterval(fetchMetrics, 500);
+  fetchMetrics();
+</script>
+</body>
+</html>
