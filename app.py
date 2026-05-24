@@ -1,8 +1,22 @@
 import streamlit as st
-import cv2
 import numpy as np
 import time, os, urllib.request
-from PIL import Image
+
+try:
+    from PIL import Image
+    PIL_OK = True
+except ImportError:
+    PIL_OK = False
+
+try:
+    import cv2
+    CV2_OK = True
+except ImportError:
+    CV2_OK = False
+
+IS_CLOUD = os.path.exists("/mount/src") or not CV2_OK
+
+IS_CLOUD = os.environ.get("STREAMLIT_SHARING_MODE") is not None or os.path.exists("/mount/src")
 
 st.set_page_config(page_title="Araimandi Guru", layout="wide", page_icon="🪷")
 
@@ -237,6 +251,29 @@ The AI detects your body joints automatically and draws a **green diamond** on y
 # ══════════════════════════════════════════════════════════════
 with tab_analyser:
     st.markdown("---")
+    if IS_CLOUD:
+        st.warning("⚠️ Camera not available on web version. Run the app locally to use the AI analyser.")
+        st.markdown("### Araimandi Reference Guide")
+        c1, c2 = st.columns([1,1])
+        with c1:
+            st.image(make_pose_ref(), caption="Correct Araimandi pose", use_container_width=True)
+        with c2:
+            st.markdown("""
+**Key checkpoints:**
+- 🟢 Knees pushed wide outward
+- 🟡 Heels flat on 180° baseline
+- 🧍 Spine perfectly upright
+- 📐 Knee angle: 80–110°
+
+**Scoring:**
+| Knee angle | Score |
+|-----------|-------|
+| 80–110° | 💯 Perfect |
+| 70–125° | 👍 Good |
+| 60–140° | ⚠️ Needs work |
+| >140° | ❌ Too straight |
+""")
+        st.stop()
 
     # ── RESULT VIEW ──
     if st.session_state["stage"] == "result":
