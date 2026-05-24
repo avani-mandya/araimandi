@@ -449,8 +449,8 @@
       object-fit: cover;
     }
 
-    #webcam { transform: scaleX(-1); }
-    #output-canvas { }
+    #webcam { display: none; }
+    #output-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
 
     .video-placeholder {
       position: absolute;
@@ -1330,25 +1330,30 @@
       try {
         const poses=await detector.estimatePoses(videoEl);
         ctx.clearRect(0,0,W,H);
-        // Mirror canvas to match flipped video
+        // Draw mirrored video frame onto canvas
         ctx.save();
         ctx.translate(W,0);
         ctx.scale(-1,1);
+        ctx.drawImage(videoEl,0,0,W,H);
+        ctx.restore();
+        // Draw overlays normally (no flip needed - keypoints are already mirrored)
+
 
         if (!poses.length||!poses[0].keypoints) {
           drawWarning('No pose — step back so full body is visible');
           document.getElementById('live-text').textContent='No pose detected';
-          ctx.restore();
           rafId=requestAnimationFrame(detectionLoop); return;
         }
 
         const kps=poses[0].keypoints;
-        const m=kpMap(kps);
+        // Mirror x coordinates to match flipped video display
+        const mirroredKps = kps.map(k => ({...k, x: W - k.x}));
+        const m=kpMap(mirroredKps);
         document.getElementById('placeholder').style.display='none';
 
         if (mode==='idle') {
           if (legsVisible(m)) {
-            drawDiamond(kps,null);
+            drawDiamond(mirroredKps,null);
             const la=angle2D([m['left_hip'].x,m['left_hip'].y],[m['left_knee'].x,m['left_knee'].y],[m['left_ankle'].x,m['left_ankle'].y]);
             const ra=angle2D([m['right_hip'].x,m['right_hip'].y],[m['right_knee'].x,m['right_knee'].y],[m['right_ankle'].x,m['right_ankle'].y]);
             document.getElementById('live-text').textContent=`L: ${Math.round(la)}°  R: ${Math.round(ra)}°  — press Capture`;
@@ -1357,15 +1362,13 @@
             drawWarning('Step back — full legs not visible');
             document.getElementById('live-text').textContent='Step back so full body is visible';
           }
-          ctx.restore();
           rafId=requestAnimationFrame(detectionLoop); return;
         }
 
         if (mode==='countdown') {
           const secsLeft=Math.ceil((deadline-Date.now())/1000);
-          if (legsVisible(m)) { drawDiamond(kps,null); buf.push(kps.map(k=>({...k}))); }
+          if (legsVisible(m)) { drawDiamond(mirroredKps,null); buf.push(mirroredKps.map(k=>({...k}))); }
           drawCountdown(Math.max(secsLeft,1));
-          ctx.restore();
 
           if (secsLeft<=0) {
             cancelAnimationFrame(rafId); rafId=null;
