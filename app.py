@@ -461,4 +461,3 @@ When ready, press <b>Start 45s Timer</b>, walk into Araimandi position and hold 
                 frame_win.image(img, use_container_width=True)
         finally:
             cap.release()
-
