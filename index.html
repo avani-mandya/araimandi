@@ -893,9 +893,9 @@
             </div>
           </div>
           <div class="camera-bottombar">
-            <span id="status-msg">Camera off — press Start Camera, step back so full body is visible</span>
+            <span id="status-msg">Press Start Camera first</span>
             <button id="toggle-btn" onclick="toggleCamera()">Start Camera</button>
-            <button id="capture-btn" onclick="startCountdown()" style="display:none;background:var(--gold);color:#0c0b09;border:none;padding:.6rem 1.2rem;font-size:.75rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;border-radius:2px;margin-left:8px;">▶ Capture Pose (45s)</button>
+            <button id="capture-btn" onclick="startCountdown()" disabled style="background:var(--gold);color:#0c0b09;border:none;padding:.6rem 1.2rem;font-size:.75rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;border-radius:2px;margin-left:8px;opacity:0.4;">▶ Capture Pose (45s)</button>
             <button id="cancel-btn" onclick="cancelCapture()" style="display:none;background:transparent;color:#e74c3c;border:1px solid #e74c3c;padding:.6rem 1rem;font-size:.75rem;cursor:pointer;font-family:'DM Sans',sans-serif;border-radius:2px;margin-left:8px;">❌ Cancel</button>
           </div>
         </div>
@@ -1452,7 +1452,8 @@
         btn.textContent='Start Camera';
         dot.className='live-dot'; liveText.textContent='Offline';
         document.getElementById('status-msg').textContent='Camera off — press Start Camera, step back so full body is visible';
-        document.getElementById('capture-btn').style.display='none';
+        document.getElementById('capture-btn').disabled=true;
+        document.getElementById('capture-btn').style.opacity='0.4';
         document.getElementById('cancel-btn').style.display='none';
         ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
         document.getElementById('placeholder').style.display='flex';
@@ -1481,7 +1482,8 @@
         btn.disabled=false; btn.textContent='Stop Camera';
         dot.className='live-dot on'; liveText.textContent='Step back so full body is visible';
         document.getElementById('status-msg').textContent='Step back so full body (head to feet) is visible, then press Capture Pose';
-        document.getElementById('capture-btn').style.display='inline-block';
+        document.getElementById('capture-btn').disabled=false;
+        document.getElementById('capture-btn').style.opacity='1';
         rafId=requestAnimationFrame(detectionLoop);
       } catch(e) {
         btn.disabled=false; btn.textContent='Start Camera';
