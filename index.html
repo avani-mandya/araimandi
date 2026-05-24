@@ -1275,12 +1275,9 @@
     }
 
     function drawWarning(msg) {
-      const W2=canvasEl.width||640;
-      ctx.fillStyle='rgba(230,126,34,0.9)'; ctx.fillRect(W2-330,10,320,34);
-      ctx.save(); ctx.translate(W2,0); ctx.scale(-1,1);
+      ctx.fillStyle='rgba(230,126,34,0.9)'; ctx.fillRect(10,10,420,34);
       ctx.fillStyle=WHITE; ctx.font='13px sans-serif';
-      ctx.fillText(msg,W2-330+8,32);
-      ctx.restore();
+      ctx.fillText(msg,18,32);
     }
 
     // ── Display results in sidebar ─────────────────────────────
