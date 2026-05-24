@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Araimandi — Bharatanatyam Posture Corrector</title>
+  <title>🪷 Araimandi Guru — Bharatanatyam Posture Analyser</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪷</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet" />
@@ -449,7 +450,7 @@
     }
 
     #webcam { transform: scaleX(-1); }
-    #output-canvas { transform: scaleX(-1); }
+    #output-canvas { }
 
     .video-placeholder {
       position: absolute;
@@ -793,8 +794,8 @@
       <circle cx="200" cy="200" r="8" stroke="#c9a84c" stroke-width="1" fill="none"/>
     </svg>
 
-    <p class="hero-eyebrow">Bharatanatyam · AI-Powered · Real-time</p>
-    <h1 class="hero-title">Master the<br /><em>Araimandi</em></h1>
+    <p class="hero-eyebrow">🪷 Bharatanatyam · AI-Powered · Real-time</p>
+    <h1 class="hero-title">🪷 Araimandi Guru</h1>
     <p class="hero-subtitle-script">The half-sitting posture at the heart of classical dance</p>
     <p class="hero-desc">
       An AI vision system that analyzes your Araimandi posture in real-time —
@@ -1059,200 +1060,435 @@
     <span class="footer-note">Built with MediaPipe Pose · Runs entirely in browser · No data stored</span>
   </footer>
 
-  <!-- MediaPipe -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
+  <!-- TensorFlow.js MoveNet -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
 
   <script>
-    let cameraRunning = false;
-    let mpCamera = null;
-    let poseDetector = null;
-    let stream = null;
+    // ── State ──────────────────────────────────────────────────
+    let mode       = 'idle';      // idle | countdown | captured
+    let detector   = null;
+    let stream     = null;
+    let rafId      = null;
+    let deadline   = null;
+    let buf        = [];          // frames collected during countdown
+    let capturedKP = null;        // averaged + locked keypoints
+    let capturedRatings = null;   // computed once, never again
+    let canvasReady = false;
 
-    const videoEl = document.getElementById('webcam');
+    const videoEl  = document.getElementById('webcam');
     const canvasEl = document.getElementById('output-canvas');
-    const ctx = canvasEl.getContext('2d');
+    const ctx      = canvasEl.getContext('2d');
 
-    function angle3D(a, b, c) {
-      const v1 = { x: a.x - b.x, y: a.y - b.y, z: (a.z||0) - (b.z||0) };
-      const v2 = { x: c.x - b.x, y: c.y - b.y, z: (c.z||0) - (b.z||0) };
-      const dot = v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
-      const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2);
-      const m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
-      if (!m1 || !m2) return 0;
-      return Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2)))) * 180 / Math.PI;
+    // ── Colours ────────────────────────────────────────────────
+    const GREEN  = '#00dc50';
+    const YELLOW = '#ffff00';
+    const RED    = '#ff5050';
+    const ORANGE = '#ffa500';
+    const WHITE  = '#f0ead8';
+    const BLACK  = 'rgba(0,0,0,0.85)';
+
+    // ── MoveNet keypoint map ───────────────────────────────────
+    // Returns {name: {x,y,score}} in PIXEL coords
+    function kpMap(kps) {
+      const m = {};
+      kps.forEach(k => { m[k.name] = {x: k.x, y: k.y, score: k.score||0}; });
+      return m;
     }
 
-    function rateKnee(deg) {
-      if (deg >= 75 && deg <= 105) return { cls:'good', label:'Correct ✓', color:'#27ae60' };
-      if (deg >= 60 && deg <= 120) return { cls:'warn', label:'Adjust', color:'#e67e22' };
-      return { cls:'bad', label:'Incorrect', color:'#e74c3c' };
+    // Average buffer of keypoint arrays → integer pixel coords
+    function averageKP(buffer) {
+      const n = buffer.length;
+      return buffer[0].map((kp, i) => ({
+        name:  kp.name,
+        x:     Math.round(buffer.reduce((s,f) => s+f[i].x, 0) / n),
+        y:     Math.round(buffer.reduce((s,f) => s+f[i].y, 0) / n),
+        score: buffer.reduce((s,f) => s+(f[i].score||0), 0) / n
+      }));
     }
 
-    function rateSpine(deg) {
-      if (deg >= 160) return { cls:'good', label:'Upright ✓', color:'#27ae60' };
-      if (deg >= 140) return { cls:'warn', label:'Slight lean', color:'#e67e22' };
-      return { cls:'bad', label:'Leaning', color:'#e74c3c' };
+    // Check legs are visible
+    function legsVisible(m) {
+      return ['left_hip','right_hip','left_knee','right_knee',
+              'left_ankle','right_ankle'].every(n => (m[n]||{score:0}).score > 0.35);
     }
 
-    function rateHip(ratio) {
-      if (ratio >= 0.28 && ratio <= 0.55) return { cls:'good', label:'Wide ✓', color:'#27ae60' };
-      if (ratio >= 0.18 && ratio <= 0.62) return { cls:'warn', label:'Widen more', color:'#e67e22' };
-      return { cls:'bad', label:'Too narrow', color:'#e74c3c' };
+    // ── Geometry ───────────────────────────────────────────────
+    function angle2D(a, b, c) {
+      const v1 = [a[0]-b[0], a[1]-b[1]];
+      const v2 = [c[0]-b[0], c[1]-b[1]];
+      const m1 = Math.hypot(...v1), m2 = Math.hypot(...v2);
+      if (!m1||!m2) return 180;
+      return Math.acos(Math.max(-1,Math.min(1,(v1[0]*v2[0]+v1[1]*v2[1])/(m1*m2)))) * 180/Math.PI;
     }
 
-    function setMetric(valId, stId, val, rate) {
-      const vEl = document.getElementById(valId);
-      const sEl = document.getElementById(stId);
-      vEl.textContent = val;
-      vEl.className = 'angle-val c-' + rate.cls;
-      sEl.textContent = rate.label;
-      sEl.className = 'angle-status c-' + rate.cls;
+    // ── Scoring ────────────────────────────────────────────────
+    function rateKnee(ang) {
+      if ( 80<=ang&&ang<=110) return {cls:'good', label:'Perfect ✓',   color:GREEN};
+      if ( 70<=ang&&ang<=125) return {cls:'warn', label:'Good',        color:ORANGE};
+      if ( 60<=ang&&ang<=140) return {cls:'warn', label:'Needs work',  color:ORANGE};
+      if ( 50<=ang&&ang<=155) return {cls:'bad',  label:'Too straight',color:RED};
+      return                         {cls:'bad',  label:'Not Araimandi',color:RED};
     }
 
-    function onResults(results) {
-      canvasEl.width = videoEl.videoWidth || 640;
-      canvasEl.height = videoEl.videoHeight || 480;
-      ctx.save();
-      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    function rateFeet(diff) {
+      if (diff<=15)  return {cls:'good', label:'Level ✓',  color:GREEN};
+      if (diff<=40)  return {cls:'warn', label:'Uneven',   color:ORANGE};
+      return                {cls:'bad',  label:'Very uneven',color:RED};
+    }
 
-      const dot = document.getElementById('live-dot');
-      const liveText = document.getElementById('live-text');
+    // ── Analyse keypoints ──────────────────────────────────────
+    function analyse(kps) {
+      const W = canvasEl.width||640, H = canvasEl.height||480;
+      const m = kpMap(kps);
 
-      if (!results.poseLandmarks) {
-        dot.className = 'live-dot detecting';
-        liveText.textContent = 'Searching…';
-        ctx.restore();
-        return;
-      }
+      const lh = m['left_hip'],    rh = m['right_hip'];
+      const lk = m['left_knee'],   rk = m['right_knee'];
+      const la = m['left_ankle'],  ra = m['right_ankle'];
+      // Use foot_index for floor baseline (lowest point)
+      const lf = m['left_foot_index']  || m['left_ankle'];
+      const rf = m['right_foot_index'] || m['right_ankle'];
 
-      const lm = results.poseLandmarks;
-      document.getElementById('placeholder').style.display = 'none';
+      const hipMid  = {x:(lh.x+rh.x)/2, y:(lh.y+rh.y)/2};
+      const feetMid = {x:(lf.x+rf.x)/2, y:(lf.y+rf.y)/2};
+      const floorY  = Math.min((lf.y+rf.y)/2, H-8);
 
-      drawConnectors(ctx, lm, POSE_CONNECTIONS, { color:'rgba(201,168,76,0.2)', lineWidth:1.5 });
+      // Knee angles (hip→knee→ankle)
+      const lAng = angle2D([lh.x,lh.y],[lk.x,lk.y],[la.x,la.y]);
+      const rAng = angle2D([rh.x,rh.y],[rk.x,rk.y],[ra.x,ra.y]);
+      const lR   = rateKnee(lAng);
+      const rR   = rateKnee(rAng);
 
-      const lk = angle3D(lm[23], lm[25], lm[27]);
-      const rk = angle3D(lm[24], lm[26], lm[28]);
-      const sp1 = angle3D(lm[11], lm[23], lm[25]);
-      const sp2 = angle3D(lm[12], lm[24], lm[26]);
-      const sp = (sp1 + sp2) / 2;
-      const hipD = Math.hypot(lm[23].x-lm[24].x, lm[23].y-lm[24].y);
-      const shD = Math.hypot(lm[11].x-lm[12].x, lm[11].y-lm[12].y);
-      const hr = shD > 0 ? hipD/shD : 0;
+      // Feet level
+      const ftDiff = Math.abs(lf.y - rf.y);
+      const ftR    = rateFeet(ftDiff);
 
-      const lkR = rateKnee(lk), rkR = rateKnee(rk);
-      const spR = rateSpine(sp), hwR = rateHip(hr);
+      const scores = [lR,rR,ftR].map(r=>r.cls==='good'?100:r.cls==='warn'?60:20);
+      const overall = Math.round(scores.reduce((a,b)=>a+b)/3);
 
-      setMetric('lk-val','lk-st', Math.round(lk)+'°', lkR);
-      setMetric('rk-val','rk-st', Math.round(rk)+'°', rkR);
-      setMetric('sp-val','sp-st', Math.round(sp)+'°', spR);
-      setMetric('hw-val','hw-st', Math.round(hr*100)+'%', hwR);
+      return {lAng,rAng,lR,rR,ftR,overall,hipMid,feetMid,floorY,lk,rk,lf,rf};
+    }
 
-      const sc = [lkR,rkR,spR,hwR].map(r=>r.cls==='good'?100:r.cls==='warn'?60:20);
-      const overall = Math.round(sc.reduce((a,b)=>a+b)/sc.length);
-      const snEl = document.getElementById('score-num');
-      snEl.textContent = overall+'%';
-      snEl.style.color = overall>=80?'#27ae60':overall>=50?'#e67e22':'#e74c3c';
-      document.getElementById('score-verdict').textContent =
-        overall>=80 ? 'Excellent Araimandi!' : overall>=50 ? 'Needs adjustment' : 'Incorrect posture';
+    // ── Drawing ────────────────────────────────────────────────
+    function drawDiamond(kps, ratings) {
+      const W = canvasEl.width||640, H = canvasEl.height||480;
+      const m = kpMap(kps);
+      const lh=m['left_hip'], rh=m['right_hip'];
+      const lk=m['left_knee'],rk=m['right_knee'];
+      const la=m['left_ankle'],ra=m['right_ankle'];
+      const lf=m['left_foot_index']||m['left_ankle'];
+      const rf=m['right_foot_index']||m['right_ankle'];
 
-      const fb = [];
-      if (lkR.cls!=='good') fb.push({color:lkR.color, msg: lkR.cls==='bad'?'Left knee points forward — rotate outward':'Left knee almost there — open a little wider'});
-      if (rkR.cls!=='good') fb.push({color:rkR.color, msg: rkR.cls==='bad'?'Right knee points forward — rotate outward':'Right knee almost there — open a little wider'});
-      if (spR.cls!=='good') fb.push({color:spR.color, msg: spR.cls==='bad'?'Back leaning forward — straighten your spine':'Slight forward lean — lift your chest'});
-      if (hwR.cls!=='good') fb.push({color:hwR.color, msg: hwR.cls==='bad'?'Stance too narrow — step your feet further apart':'Widen your stance slightly more'});
-      if (fb.length===0) fb.push({color:'#27ae60', msg:'Perfect Araimandi! Hold and feel the posture.'});
+      const hipMid  = {x:(lh.x+rh.x)/2, y:(lh.y+rh.y)/2};
+      const feetMid = {x:(lf.x+rf.x)/2, y:(lf.y+rf.y)/2};
+      const floorY  = Math.min((lf.y+rf.y)/2, H-8);
 
-      document.getElementById('feedback-list').innerHTML =
-        fb.map(f=>`<div class="feedback-item"><div class="fb-dot" style="background:${f.color}"></div><span>${f.msg}</span></div>`).join('');
+      const lCol = ratings ? ratings.lR.color : GREEN;
+      const rCol = ratings ? ratings.rR.color : GREEN;
+      const fCol = ratings ? ratings.ftR.color : YELLOW;
 
-      [23,24,25,26,27,28,11,12].forEach(i => {
-        const p = lm[i];
-        const x = p.x*canvasEl.width, y = p.y*canvasEl.height;
-        const isKnee = i===25||i===26;
-        const color = isKnee ? (i===25?lkR:rkR).color : 'rgba(201,168,76,0.7)';
-        ctx.beginPath();
-        ctx.arc(x, y, isKnee?9:5, 0, 2*Math.PI);
-        ctx.fillStyle = color;
-        ctx.fill();
-        if (isKnee) {
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        }
+      // Diamond lines
+      ctx.lineWidth = 4;
+      [[hipMid,{x:lk.x,y:lk.y},lCol],[hipMid,{x:rk.x,y:rk.y},rCol],
+       [{x:lk.x,y:lk.y},feetMid,lCol],[{x:rk.x,y:rk.y},feetMid,rCol]
+      ].forEach(([a,b,c]) => {
+        ctx.beginPath(); ctx.strokeStyle=c;
+        ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
       });
 
-      dot.className = 'live-dot on';
-      liveText.textContent = 'Live · Analyzing';
-      ctx.restore();
+      // Dots
+      [
+        [hipMid.x,hipMid.y,9,GREEN],
+        [lk.x,lk.y,12,lCol],[rk.x,rk.y,12,rCol],
+        [feetMid.x,feetMid.y,9,fCol],
+        [lf.x,lf.y,7,fCol],[rf.x,rf.y,7,fCol]
+      ].forEach(([x,y,r,c]) => {
+        ctx.beginPath(); ctx.arc(x,y,r,0,2*Math.PI);
+        ctx.fillStyle=c; ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=2; ctx.stroke();
+      });
+
+      // 180° yellow baseline at foot level
+      ctx.beginPath(); ctx.strokeStyle=YELLOW; ctx.lineWidth=6;
+      ctx.moveTo(0,floorY); ctx.lineTo(W,floorY); ctx.stroke();
+
+      // Foot dots on baseline
+      [lf.x,rf.x].forEach(x => {
+        ctx.beginPath(); ctx.arc(x,floorY,10,0,2*Math.PI);
+        ctx.fillStyle=YELLOW; ctx.fill();
+        ctx.strokeStyle=WHITE; ctx.lineWidth=2; ctx.stroke();
+      });
+
+      // Baseline label
+      ctx.fillStyle=BLACK;
+      ctx.fillRect(W/2-115,floorY-28,230,22);
+      ctx.fillStyle=YELLOW;
+      ctx.font='bold 13px sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText('180° FEET BASELINE',W/2,floorY-12);
+      ctx.textAlign='left';
+
+      if (ratings) {
+        // Knee angle labels
+        [[lk.x,lk.y,ratings.lAng,ratings.lR,'L'],
+         [rk.x,rk.y,ratings.rAng,ratings.rR,'R']].forEach(([x,y,ang,r,side]) => {
+          const dx = side==='L' ? -120 : 14;
+          const txt = `${side}: ${Math.round(ang)}°`;
+          ctx.fillStyle=BLACK; ctx.fillRect(x+dx-3,y-30,110,24);
+          ctx.fillStyle=r.color; ctx.font='bold 13px sans-serif';
+          ctx.fillText(txt,x+dx,y-12);
+        });
+
+        // Score badge
+        const ov = ratings.overall;
+        const oc = ov>=80?GREEN:ov>=55?ORANGE:RED;
+        ctx.fillStyle=BLACK; ctx.fillRect(8,8,220,50);
+        ctx.fillStyle=oc; ctx.font='bold 24px sans-serif';
+        ctx.fillText(`Score: ${ov}%`,14,44);
+
+        // Locked badge
+        ctx.fillStyle='rgba(39,174,96,0.9)';
+        ctx.fillRect(W-175,10,165,32);
+        ctx.fillStyle=WHITE; ctx.font='bold 13px sans-serif';
+        ctx.textAlign='center';
+        ctx.fillText('✓ Pose Locked',W-92,31);
+        ctx.textAlign='left';
+      } else {
+        // Live angles at bottom
+        const lAng = angle2D([lh.x,lh.y],[lk.x,lk.y],[la.x,la.y]);
+        const rAng = angle2D([rh.x,rh.y],[rk.x,rk.y],[ra.x,ra.y]);
+        ctx.fillStyle=BLACK; ctx.fillRect(0,H-40,W,40);
+        ctx.fillStyle=WHITE; ctx.font='14px sans-serif';
+        ctx.fillText(`L knee: ${Math.round(lAng)}°  |  R knee: ${Math.round(rAng)}°  |  Target: 80–110°`,10,H-14);
+      }
     }
 
-    async function toggleCamera() {
-      const btn = document.getElementById('toggle-btn');
-      const dot = document.getElementById('live-dot');
-      const liveText = document.getElementById('live-text');
+    function drawCountdown(secsLeft) {
+      const W=canvasEl.width||640, H=canvasEl.height||480;
+      ctx.fillStyle='rgba(12,11,9,0.6)'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#c9a84c'; ctx.font=`bold ${Math.round(W*0.22)}px serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(secsLeft,W/2,H/2);
+      ctx.fillStyle=WHITE; ctx.font=`${Math.round(W*0.04)}px sans-serif`;
+      ctx.fillText('Hold your Araimandi still…',W/2,H/2+W*0.16);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    }
 
-      if (cameraRunning) {
-        if (mpCamera) mpCamera.stop();
-        if (stream) stream.getTracks().forEach(t => t.stop());
-        cameraRunning = false;
-        btn.textContent = 'Start Camera';
-        dot.className = 'live-dot';
-        liveText.textContent = 'Offline';
-        document.getElementById('status-msg').textContent = 'Camera off';
-        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-        document.getElementById('placeholder').style.display = 'flex';
-        document.getElementById('score-num').textContent = '—';
-        document.getElementById('score-num').style.color = '';
-        document.getElementById('score-verdict').textContent = 'Awaiting pose detection';
+    function drawWarning(msg) {
+      ctx.fillStyle='rgba(230,126,34,0.9)'; ctx.fillRect(10,10,320,34);
+      ctx.fillStyle=WHITE; ctx.font='13px sans-serif';
+      ctx.fillText(msg,18,32);
+    }
+
+    // ── Display results in sidebar ─────────────────────────────
+    function displayResults(r) {
+      function sm(vi,si,val,rate) {
+        document.getElementById(vi).textContent=val;
+        document.getElementById(vi).className='angle-val c-'+rate.cls;
+        document.getElementById(si).textContent=rate.label;
+        document.getElementById(si).className='angle-status c-'+rate.cls;
+      }
+      sm('lk-val','lk-st',Math.round(r.lAng)+'°',r.lR);
+      sm('rk-val','rk-st',Math.round(r.rAng)+'°',r.rR);
+      sm('sp-val','sp-st','—',{cls:'good',label:'Upright'});
+      sm('hw-val','hw-st','—',r.ftR);
+
+      // Update labels
+      document.querySelector('#analyzer .angle-cell:nth-child(1) .angle-name').textContent='Left Knee';
+      document.querySelector('#analyzer .angle-cell:nth-child(2) .angle-name').textContent='Right Knee';
+      document.querySelector('#analyzer .angle-cell:nth-child(3) .angle-name').textContent='Spine';
+      document.querySelector('#analyzer .angle-cell:nth-child(4) .angle-name').textContent='Feet Level';
+
+      const sn=document.getElementById('score-num');
+      sn.textContent=r.overall+'%';
+      sn.style.color=r.overall>=80?'#27ae60':r.overall>=55?'#e67e22':'#e74c3c';
+      document.getElementById('score-verdict').textContent=
+        r.overall>=80?'Excellent Araimandi!':r.overall>=55?'Needs adjustment':'Incorrect posture';
+
+      const fb=[];
+      if(r.lAng>110) fb.push({c:r.lR.color,m:`Left knee ${Math.round(r.lAng)}° — push outward (target 80–110°)`});
+      else if(r.lAng<70) fb.push({c:r.lR.color,m:`Left knee ${Math.round(r.lAng)}° — sit a little higher`});
+      if(r.rAng>110) fb.push({c:r.rR.color,m:`Right knee ${Math.round(r.rAng)}° — push outward (target 80–110°)`});
+      else if(r.rAng<70) fb.push({c:r.rR.color,m:`Right knee ${Math.round(r.rAng)}° — sit a little higher`});
+      if(r.ftR.cls!=='good') fb.push({c:r.ftR.color,m:'Feet uneven — keep both heels flat on the floor'});
+      if(!fb.length) fb.push({c:'#27ae60',m:'Perfect Araimandi! Hold this position.'});
+      document.getElementById('feedback-list').innerHTML=
+        fb.map(f=>`<div class="feedback-item"><div class="fb-dot" style="background:${f.c}"></div><span>${f.m}</span></div>`).join('');
+    }
+
+    // ── Main detection loop ────────────────────────────────────
+    async function detectionLoop() {
+      if (!detector || mode==='captured') return;
+
+      if (!canvasReady && videoEl.videoWidth) {
+        canvasEl.width=videoEl.videoWidth;
+        canvasEl.height=videoEl.videoHeight;
+        canvasReady=true;
+      }
+      const W=canvasEl.width||640, H=canvasEl.height||480;
+
+      try {
+        const poses=await detector.estimatePoses(videoEl);
+        ctx.clearRect(0,0,W,H);
+        // Mirror canvas to match flipped video
+        ctx.save();
+        ctx.translate(W,0);
+        ctx.scale(-1,1);
+
+        if (!poses.length||!poses[0].keypoints) {
+          drawWarning('No pose — step back so full body is visible');
+          document.getElementById('live-text').textContent='No pose detected';
+          ctx.restore();
+          rafId=requestAnimationFrame(detectionLoop); return;
+        }
+
+        const kps=poses[0].keypoints;
+        const m=kpMap(kps);
+        document.getElementById('placeholder').style.display='none';
+
+        if (mode==='idle') {
+          if (legsVisible(m)) {
+            drawDiamond(kps,null);
+            const la=angle2D([m['left_hip'].x,m['left_hip'].y],[m['left_knee'].x,m['left_knee'].y],[m['left_ankle'].x,m['left_ankle'].y]);
+            const ra=angle2D([m['right_hip'].x,m['right_hip'].y],[m['right_knee'].x,m['right_knee'].y],[m['right_ankle'].x,m['right_ankle'].y]);
+            document.getElementById('live-text').textContent=`L: ${Math.round(la)}°  R: ${Math.round(ra)}°  — press Capture`;
+            document.getElementById('live-dot').className='live-dot on';
+          } else {
+            drawWarning('Step back — full legs not visible');
+            document.getElementById('live-text').textContent='Step back so full body is visible';
+          }
+          ctx.restore();
+          rafId=requestAnimationFrame(detectionLoop); return;
+        }
+
+        if (mode==='countdown') {
+          const secsLeft=Math.ceil((deadline-Date.now())/1000);
+          if (legsVisible(m)) { drawDiamond(kps,null); buf.push(kps.map(k=>({...k}))); }
+          drawCountdown(Math.max(secsLeft,1));
+          ctx.restore();
+
+          if (secsLeft<=0) {
+            cancelAnimationFrame(rafId); rafId=null;
+            if (buf.length>=3) {
+              capturedKP=averageKP(buf);
+              capturedRatings=analyse(capturedKP);
+              displayResults(capturedRatings);
+              ctx.clearRect(0,0,W,H);
+              drawDiamond(capturedKP,capturedRatings);
+              mode='captured';
+              document.getElementById('capture-btn').disabled=false;
+              document.getElementById('capture-btn').textContent='Recapture (45s)';
+              document.getElementById('cancel-btn').style.display='none';
+              document.getElementById('live-text').textContent='Pose locked ✓';
+            } else {
+              mode='idle'; buf=[];
+              document.getElementById('capture-btn').disabled=false;
+              document.getElementById('capture-btn').textContent='Capture Pose (45s)';
+              document.getElementById('cancel-btn').style.display='none';
+              document.getElementById('live-text').textContent='Legs not visible — try again';
+              rafId=requestAnimationFrame(detectionLoop);
+            }
+            return;
+          }
+          rafId=requestAnimationFrame(detectionLoop); return;
+        }
+      } catch(e) {
+        rafId=requestAnimationFrame(detectionLoop);
+      }
+    }
+
+    // ── Build capture UI ───────────────────────────────────────
+    function buildUI() {
+      const bar=document.querySelector('.cam-bottom');
+      if (bar && !document.getElementById('capture-btn')) {
+        const btn=document.createElement('button');
+        btn.id='capture-btn'; btn.textContent='Capture Pose (45s)';
+        btn.style.cssText='background:var(--gold);color:#0c0b09;border:none;padding:.6rem 1.2rem;font-size:.75rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:"DM Sans",sans-serif;border-radius:2px;margin-left:8px;';
+        btn.onclick=startCountdown;
+        bar.appendChild(btn);
+
+        const cancel=document.createElement('button');
+        cancel.id='cancel-btn'; cancel.textContent='❌ Cancel';
+        cancel.style.cssText='background:transparent;color:#e74c3c;border:1px solid #e74c3c;padding:.6rem 1rem;font-size:.75rem;cursor:pointer;font-family:"DM Sans",sans-serif;border-radius:2px;margin-left:8px;display:none;';
+        cancel.onclick=cancelCapture;
+        bar.appendChild(cancel);
+      }
+    }
+
+    async function startCountdown() {
+      if (!detector) return;
+      mode='countdown'; deadline=Date.now()+45000; buf=[];
+      document.getElementById('capture-btn').disabled=true;
+      document.getElementById('capture-btn').textContent='Capturing…';
+      document.getElementById('cancel-btn').style.display='inline-block';
+      // Reset display
+      ['lk-val','rk-val','sp-val','hw-val'].forEach(id=>{
+        document.getElementById(id).textContent='—';
+        document.getElementById(id).className='angle-val';
+      });
+      document.getElementById('score-num').textContent='—';
+      document.getElementById('score-num').style.color='';
+      document.getElementById('score-verdict').textContent='Hold your Araimandi…';
+      document.getElementById('feedback-list').innerHTML='<p class="idle-tip">Collecting pose data…</p>';
+      if (!rafId) rafId=requestAnimationFrame(detectionLoop);
+    }
+
+    function cancelCapture() {
+      mode='idle'; buf=[];
+      cancelAnimationFrame(rafId);
+      document.getElementById('capture-btn').disabled=false;
+      document.getElementById('capture-btn').textContent='Capture Pose (45s)';
+      document.getElementById('cancel-btn').style.display='none';
+      document.getElementById('live-text').textContent='Cancelled — press Capture when ready';
+      rafId=requestAnimationFrame(detectionLoop);
+    }
+
+    // ── Camera toggle ──────────────────────────────────────────
+    async function toggleCamera() {
+      const btn=document.getElementById('toggle-btn');
+      const dot=document.getElementById('live-dot');
+      const liveText=document.getElementById('live-text');
+
+      if (stream) {
+        cancelAnimationFrame(rafId); rafId=null;
+        stream.getTracks().forEach(t=>t.stop()); stream=null;
+        mode='idle'; buf=[]; capturedKP=null; canvasReady=false;
+        btn.textContent='Start Camera';
+        dot.className='live-dot'; liveText.textContent='Offline';
+        document.getElementById('status-msg').textContent='Camera off';
+        ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
+        document.getElementById('placeholder').style.display='flex';
+        document.getElementById('score-num').textContent='—';
+        document.getElementById('score-verdict').textContent='Awaiting pose detection';
         return;
       }
 
-      btn.disabled = true;
-      btn.textContent = 'Initializing…';
-      dot.className = 'live-dot detecting';
-      liveText.textContent = 'Starting…';
-      document.getElementById('status-msg').textContent = 'Starting camera…';
+      btn.disabled=true; btn.textContent='Loading…';
+      dot.className='live-dot detecting'; liveText.textContent='Loading MoveNet…';
+      document.getElementById('status-msg').textContent='Loading pose model…';
 
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width:640, height:480, facingMode:'user' } });
-        videoEl.srcObject = stream;
-        await videoEl.play();
-        document.getElementById('placeholder').style.display = 'none';
-
-        if (!poseDetector) {
-          poseDetector = new Pose({
-            locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${f}`
-          });
-          poseDetector.setOptions({
-            modelComplexity: 1,
-            smoothLandmarks: true,
-            enableSegmentation: false,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-          });
-          poseDetector.onResults(onResults);
+        if (!detector) {
+          detector=await poseDetection.createDetector(
+            poseDetection.SupportedModels.MoveNet,
+            {modelType:poseDetection.movenet.modelType.SINGLEPOSE_THUNDER});
         }
-
-        mpCamera = new Camera(videoEl, {
-          onFrame: async () => { await poseDetector.send({ image: videoEl }); },
-          width: 640, height: 480
-        });
-        await mpCamera.start();
-
-        cameraRunning = true;
-        btn.disabled = false;
-        btn.textContent = 'Stop Camera';
-        document.getElementById('status-msg').textContent = 'Detecting pose…';
-
+        stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}});
+        videoEl.srcObject=stream;
+        await videoEl.play();
+        canvasEl.width=videoEl.videoWidth||640;
+        canvasEl.height=videoEl.videoHeight||480;
+        canvasReady=true;
+        document.getElementById('placeholder').style.display='none';
+        btn.disabled=false; btn.textContent='Stop Camera';
+        dot.className='live-dot on'; liveText.textContent='Step back so full body is visible';
+        document.getElementById('status-msg').textContent='Get into Araimandi, then press Capture Pose';
+        buildUI();
+        rafId=requestAnimationFrame(detectionLoop);
       } catch(e) {
-        btn.disabled = false;
-        btn.textContent = 'Start Camera';
-        dot.className = 'live-dot';
-        liveText.textContent = 'Error';
-        document.getElementById('status-msg').textContent = 'Error: ' + (e.message || 'Permission denied');
-        document.getElementById('placeholder').querySelector('p').textContent = 'Camera access denied. Please allow permissions and refresh.';
+        btn.disabled=false; btn.textContent='Start Camera';
+        dot.className='live-dot'; liveText.textContent='Error';
+        document.getElementById('status-msg').textContent='Error: '+(e.message||'Permission denied');
       }
     }
   </script>
