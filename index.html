@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🪷 Araimandi Guru — Bharatanatyam Posture Analyser</title>
+  <title>Araimandi Guru — Bharatanatyam Posture Analyser</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪷</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -794,8 +794,8 @@
       <circle cx="200" cy="200" r="8" stroke="#c9a84c" stroke-width="1" fill="none"/>
     </svg>
 
-    <p class="hero-eyebrow">🪷 Bharatanatyam · AI-Powered · Real-time</p>
-    <h1 class="hero-title">🪷 Araimandi Guru</h1>
+    <p class="hero-eyebrow">Bharatanatyam · AI-Powered · Real-time</p>
+    <h1 class="hero-title">Araimandi Guru</h1>
     <p class="hero-subtitle-script">The half-sitting posture at the heart of classical dance</p>
     <p class="hero-desc">
       An AI vision system that analyzes your Araimandi posture in real-time —
@@ -895,7 +895,7 @@
           <div class="camera-bottombar">
             <span id="status-msg">Press Start Camera first</span>
             <button id="toggle-btn" onclick="toggleCamera()">Start Camera</button>
-            <button id="capture-btn" onclick="startCountdown()" disabled style="background:var(--gold);color:#0c0b09;border:none;padding:.6rem 1.2rem;font-size:.75rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;border-radius:2px;margin-left:8px;opacity:0.4;">▶ Capture Pose (45s)</button>
+            <button id="capture-btn" onclick="startCountdown()" disabled style="background:var(--gold);color:#0c0b09;border:none;padding:.6rem 1.2rem;font-size:.75rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;border-radius:2px;margin-left:8px;opacity:0.4;">▶ Capture Pose (30s)</button>
             <button id="cancel-btn" onclick="cancelCapture()" style="display:none;background:transparent;color:#e74c3c;border:1px solid #e74c3c;padding:.6rem 1rem;font-size:.75rem;cursor:pointer;font-family:'DM Sans',sans-serif;border-radius:2px;margin-left:8px;">❌ Cancel</button>
           </div>
         </div>
@@ -1373,14 +1373,14 @@
               drawDiamond(capturedKP,capturedRatings);
               mode='captured';
               document.getElementById('capture-btn').disabled=false;
-              document.getElementById('capture-btn').textContent='▶ Recapture (45s)';
+              document.getElementById('capture-btn').textContent='▶ Recapture (30s)';
               document.getElementById('capture-btn').style.display='inline-block';
               document.getElementById('cancel-btn').style.display='none';
               document.getElementById('live-text').textContent='Pose locked ✓';
             } else {
               mode='idle'; buf=[];
               document.getElementById('capture-btn').disabled=false;
-              document.getElementById('capture-btn').textContent='Capture Pose (45s)';
+              document.getElementById('capture-btn').textContent='Capture Pose (30s)';
               document.getElementById('cancel-btn').style.display='none';
               document.getElementById('live-text').textContent='Legs not visible — try again';
               rafId=requestAnimationFrame(detectionLoop);
@@ -1399,7 +1399,7 @@
       const bar=document.querySelector('.cam-bottom');
       if (bar && !document.getElementById('capture-btn')) {
         const btn=document.createElement('button');
-        btn.id='capture-btn'; btn.textContent='Capture Pose (45s)';
+        btn.id='capture-btn'; btn.textContent='Capture Pose (30s)';
         btn.style.cssText='background:var(--gold);color:#0c0b09;border:none;padding:.6rem 1.2rem;font-size:.75rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:"DM Sans",sans-serif;border-radius:2px;margin-left:8px;';
         btn.onclick=startCountdown;
         bar.appendChild(btn);
@@ -1414,7 +1414,7 @@
 
     async function startCountdown() {
       if (!detector) return;
-      mode='countdown'; deadline=Date.now()+45000; buf=[];
+      mode='countdown'; deadline=Date.now()+30000; buf=[];
       document.getElementById('capture-btn').disabled=true;
       document.getElementById('capture-btn').textContent='Capturing…';
       document.getElementById('cancel-btn').style.display='inline-block';
@@ -1433,7 +1433,7 @@
       mode='idle'; buf=[];
       cancelAnimationFrame(rafId);
       document.getElementById('capture-btn').disabled=false;
-      document.getElementById('capture-btn').textContent='Capture Pose (45s)';
+      document.getElementById('capture-btn').textContent='Capture Pose (30s)';
       document.getElementById('cancel-btn').style.display='none';
       document.getElementById('live-text').textContent='Cancelled — press Capture when ready';
       rafId=requestAnimationFrame(detectionLoop);
